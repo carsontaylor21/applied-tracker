@@ -55,7 +55,7 @@ h1{font-size:22px;margin:0 0 4px;color:var(--accent);font-weight:600}.sub{color:
 .wh .info{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;flex:1}.wh .n{font-weight:700;font-size:11px;color:var(--accent);background:white;padding:2px 8px;border-radius:4px}.wh .th{font-weight:600;font-size:13px}.wh .dt{font-size:11px;color:var(--muted)}
 .wh .progress{font-size:11px;color:var(--muted);background:white;padding:2px 8px;border-radius:4px}
 .wb{display:none}.week.open .wb{display:block}
-.day{display:grid;grid-template-columns:55px 1fr 110px;gap:10px;padding:10px 14px;border-top:1px solid var(--border);align-items:start;font-size:12px}
+.day{display:grid;grid-template-columns:55px 1fr 130px;gap:6px 10px;padding:10px 14px;border-top:1px solid var(--border);align-items:start;font-size:12px}
 .day.we{background:var(--weekend)}.day.vac{background:var(--vacation)}.day.gr{background:var(--restricted)}.day.lg{background:var(--longday)}.day.win{background:#FFF8E1}.day.tdy{background:#fff7e0;border-left:3px solid var(--accent);padding-left:11px}.day.exm{background:var(--exam);font-weight:600}
 .day .dt{font-weight:600;color:var(--accent);font-size:11px}.day .dt .dow{color:var(--muted);font-weight:400;display:block}
 .day .tasks{display:grid;gap:4px}
@@ -63,6 +63,13 @@ h1{font-size:22px;margin:0 0 4px;color:var(--accent);font-weight:600}.sub{color:
 .day .ck{display:grid;gap:2px;grid-template-columns:repeat(5,1fr);align-items:center}
 .day .ck .ckcell{display:flex;flex-direction:column;align-items:center;gap:1px}
 .day .ck input{width:14px;height:14px;cursor:pointer;margin:0}.day .ck .l{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em}
+.day .row-extras{grid-column:1 / -1;display:flex;gap:8px;align-items:center;margin-top:4px;padding-top:6px;border-top:1px dotted var(--border)}
+.day .row-extras .energy{display:flex;gap:2px;flex-shrink:0}
+.day .row-extras .energy button{width:22px;height:22px;font-size:11px;border:1px solid var(--border);background:white;border-radius:3px;cursor:pointer;padding:0;font-weight:600;color:var(--muted)}
+.day .row-extras .energy button.active{background:var(--accent);color:white;border-color:var(--accent)}
+.day .row-extras input[type=text]{flex:1;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;font-family:inherit;min-width:0;background:#fff}
+.day .row-extras input[type=text]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(46,89,132,.15)}
+.day.exm .row-extras{display:none}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
 .legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:middle;border:1px solid var(--border)}
 </style>
@@ -340,7 +347,7 @@ function renderTracker(){
     </div>
     <div class="journal">
       <label>End-of-day journal (1 line)</label>
-      <input type="text" id="todayJournal" data-d="${tdyIso}" value="${(log.journal||'').replace(/"/g,'&quot;')}" placeholder="e.g., morning Anki worked, evening hit a wall after 30 min">
+      <input type="text" data-d="${tdyIso}" data-journal value="${(log.journal||'').replace(/"/g,'&quot;')}" placeholder="e.g., morning Anki worked, evening hit a wall after 30 min">
       <div class="e">
         <span style="font-size:10px;color:var(--muted);margin-right:4px;">Energy:</span>
         ${[1,2,3,4,5].map(n=>`<button data-energy="${n}" data-d="${tdyIso}" class="${log.energy===n?'active':''}">${n}</button>`).join("")}
@@ -394,6 +401,8 @@ function renderTracker(){
           <span class="l">${FIELD_LABELS[f]}</span>
         </div>`).join("");
 
+      const energyHtml = [1,2,3,4,5].map(n => `<button data-energy="${n}" data-d="${iso}" class="${dlog.energy===n?'active':''}">${n}</button>`).join("");
+      const journalVal = (dlog.journal||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       dh += `
         <div class="${cls}">
           <div class="dt">${fmt(dt)}<span class="dow">${DN[dowI]}</span></div>
@@ -406,6 +415,10 @@ function renderTracker(){
             ${dd.no?`<div class="nt">${dd.no}</div>`:""}
           </div>
           <div class="ck">${cks}</div>
+          <div class="row-extras">
+            <div class="energy">${energyHtml}</div>
+            <input type="text" data-d="${iso}" data-journal value="${journalVal}" placeholder="journal: how did the day go?">
+          </div>
         </div>`;
     });
 
@@ -431,11 +444,31 @@ function renderTracker(){
   document.body.addEventListener('input', handleInput);
 }
 
+// Sync all DOM elements that bind to (date, field) so today card and week list stay in step.
+function syncDOM(date, field, value){
+  if (field === 'energy'){
+    document.querySelectorAll(`button[data-energy][data-d="${date}"]`).forEach(b => {
+      b.classList.toggle('active', value !== null && parseInt(b.dataset.energy,10) === value);
+    });
+  } else if (field === 'journal'){
+    document.querySelectorAll(`input[data-d="${date}"][data-journal]`).forEach(el => {
+      // Don't overwrite the input the user is currently typing in
+      if (el !== document.activeElement && el.value !== (value || '')) el.value = value || '';
+    });
+  } else {
+    // Boolean checkbox fields
+    document.querySelectorAll(`input[type=checkbox][data-d="${date}"][data-f="${field}"]`).forEach(el => {
+      if (el.checked !== !!value) el.checked = !!value;
+    });
+  }
+}
+
 function handleChange(e){
   const t = e.target;
   if (t.matches('input[type=checkbox][data-f][data-d]')){
-    const date = t.dataset.d, field = t.dataset.f;
-    saveDay(date, { [field]: t.checked });
+    const date = t.dataset.d, field = t.dataset.f, value = t.checked;
+    syncDOM(date, field, value);          // Mirror to other rendered checkboxes immediately
+    saveDay(date, { [field]: value }).then(()=>updateWeekProgress(date));
   }
 }
 
@@ -443,19 +476,42 @@ function handleClick(e){
   const t = e.target;
   if (t.matches('button[data-energy][data-d]')){
     const date = t.dataset.d, energy = parseInt(t.dataset.energy, 10);
-    // Toggle off if already active
     const wasActive = t.classList.contains('active');
-    document.querySelectorAll(`button[data-energy][data-d="${date}"]`).forEach(b=>b.classList.remove('active'));
-    if (!wasActive) t.classList.add('active');
-    saveDay(date, { energy: wasActive ? null : energy });
+    const newValue = wasActive ? null : energy;
+    syncDOM(date, 'energy', newValue);
+    saveDay(date, { energy: newValue });
   }
 }
 
 function handleInput(e){
   const t = e.target;
-  if (t.matches('input[type=text][data-d]') && t.id === 'todayJournal'){
-    const date = t.dataset.d;
-    saveDayDebounced(date, { journal: t.value });
+  if (t.matches('input[type=text][data-d][data-journal]')){
+    const date = t.dataset.d, value = t.value;
+    syncDOM(date, 'journal', value);      // Mirror to other rendered journals immediately
+    saveDayDebounced(date, { journal: value });
+  }
+}
+
+// Update week-header progress badge after a checkbox flips, without full re-render.
+function updateWeekProgress(date){
+  const wIdx = W.findIndex(w => {
+    const ws = new Date(w.s+'T00:00:00');
+    const we = dAdd(w.s, w.days.length-1);
+    const d = new Date(date+'T00:00:00');
+    return d >= ws && d <= we;
+  });
+  if (wIdx < 0) return;
+  const w = W[wIdx];
+  let total = 0, done = 0;
+  w.days.forEach((_, i) => {
+    const iso = isoOf(dAdd(w.s, i));
+    const dlog = getLog(iso);
+    FIELDS.forEach(f => { total++; if (dlog[f]) done++; });
+  });
+  const weekEl = document.querySelectorAll('.week')[wIdx];
+  if (weekEl){
+    const badge = weekEl.querySelector('.wh .progress');
+    if (badge) badge.textContent = `${done}/${total}`;
   }
 }
 
