@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>APPLIED Exam Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:light;--bg:#fafafa;--card:#fff;--ink:#1a1a1a;--muted:#666;--accent:#2E5984;--accent-soft:#D5E8F0;--weekend:#FFF4D6;--vacation:#E8F5E9;--restricted:#FFF3E0;--longday:#E1F5FE;--exam:#FFCDD2;--border:#e5e5e5;--shadow:0 1px 2px rgba(0,0,0,0.04);--ok:#2e7d32;--err:#c62828}
+*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;margin:0;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+h1{font-size:22px;margin:0 0 4px;color:var(--accent);font-weight:600}.sub{color:var(--muted);font-size:13px;margin-bottom:8px}
+
+/* ===== Auth screen ===== */
+#auth{display:none;max-width:440px;margin:80px auto;padding:30px 28px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
+#auth h1{margin-bottom:6px}#auth p{color:var(--muted);font-size:13px;margin:0 0 18px}
+#auth label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+#auth input{display:block;width:100%;margin-top:6px;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit}
+#auth button{margin-top:14px;width:100%;padding:10px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer}
+#auth button:hover{background:#234767}#auth button:disabled{opacity:.5;cursor:not-allowed}
+#auth .msg{margin-top:14px;padding:10px 12px;border-radius:6px;font-size:13px;display:none}
+#auth .msg.ok{background:#e8f5e9;color:#1b5e20;display:block}
+#auth .msg.err{background:#ffebee;color:#b71c1c;display:block}
+
+/* ===== Header / status ===== */
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.topbar .who{font-size:12px;color:var(--muted)}.topbar .who strong{color:var(--ink)}
+.topbar button{padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:var(--card);font-size:12px;cursor:pointer;color:var(--muted)}
+.topbar button:hover{background:var(--accent-soft);color:var(--accent)}
+#syncStatus{font-size:11px;color:var(--muted);padding:3px 8px;border-radius:4px;background:#f0f0f0}
+#syncStatus.saving{background:#fff3e0;color:#e65100}#syncStatus.saved{background:#e8f5e9;color:var(--ok)}#syncStatus.err{background:#ffebee;color:var(--err)}
+
+/* ===== Tracker ===== */
+#tracker{display:none}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:var(--shadow)}
+.stat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.stat .v{font-size:17px;font-weight:600;color:var(--accent);margin-top:2px}.stat .v.exam{color:var(--err)}
+.today{background:var(--card);border:2px solid var(--accent);border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.today h2{margin:0 0 4px;font-size:16px;color:var(--accent)}.today .d{color:var(--muted);font-size:12px;margin-bottom:10px}
+.today-blocks{display:grid;grid-template-columns:1fr;gap:8px}@media(min-width:720px){.today-blocks{grid-template-columns:1fr 1fr}}
+.block{background:#fafafa;border-radius:6px;padding:10px;border-left:3px solid var(--accent)}
+.block.am{border-left-color:#f9a825}.block.read{border-left-color:#1976d2}.block.photos{border-left-color:#7e57c2}.block.qbank{border-left-color:#2e7d32}.block.newcards{border-left-color:#f57c00}
+.block .t{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}.block .b{font-size:13px;margin-top:3px}.block .c{margin-top:6px;font-size:12px}
+.block .c label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.journal{margin-top:10px;padding:8px 10px;background:#fffbe6;border-radius:6px;border-left:3px solid #f9a825}
+.journal label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.journal input{display:block;width:100%;margin-top:4px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:inherit}
+.journal .e{margin-top:5px;display:flex;gap:5px;align-items:center}.journal .e button{width:26px;height:26px;border:1px solid var(--border);background:white;border-radius:4px;cursor:pointer;font-weight:600}.journal .e button.active{background:var(--accent);color:white;border-color:var(--accent)}
+.note{padding:8px 12px;background:#fffbe6;border:1px solid #ffe58f;border-radius:6px;font-size:12px;color:#8b6c00;margin-bottom:12px}
+.anchor{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+.anchor h3{margin:0 0 6px;font-size:13px;color:var(--accent)}.anchor ul{margin:0;padding-left:18px;font-size:12px}.anchor li{margin-bottom:3px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.controls button{padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:var(--card);font-size:12px;cursor:pointer}.controls button:hover{background:var(--accent-soft)}
+.week{background:var(--card);border:1px solid var(--border);border-radius:7px;margin-bottom:10px;overflow:hidden}
+.wh{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:var(--accent-soft);gap:10px}.wh.vac{background:var(--vacation)}.wh.win{background:var(--exam)}.wh.ctb{background:var(--longday)}.wh.grad{background:var(--restricted)}
+.wh .info{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;flex:1}.wh .n{font-weight:700;font-size:11px;color:var(--accent);background:white;padding:2px 8px;border-radius:4px}.wh .th{font-weight:600;font-size:13px}.wh .dt{font-size:11px;color:var(--muted)}
+.wh .progress{font-size:11px;color:var(--muted);background:white;padding:2px 8px;border-radius:4px}
+.wb{display:none}.week.open .wb{display:block}
+.day{display:grid;grid-template-columns:55px 1fr 110px;gap:10px;padding:10px 14px;border-top:1px solid var(--border);align-items:start;font-size:12px}
+.day.we{background:var(--weekend)}.day.vac{background:var(--vacation)}.day.gr{background:var(--restricted)}.day.lg{background:var(--longday)}.day.win{background:#FFF8E1}.day.tdy{background:#fff7e0;border-left:3px solid var(--accent);padding-left:11px}.day.exm{background:var(--exam);font-weight:600}
+.day .dt{font-weight:600;color:var(--accent);font-size:11px}.day .dt .dow{color:var(--muted);font-weight:400;display:block}
+.day .tasks{display:grid;gap:4px}
+.day .tasks .row{display:grid;grid-template-columns:55px 1fr;gap:6px}.day .tasks .row .lbl{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}.day .tasks .row .val{line-height:1.4;font-size:11px}.day .tasks .row .val.empty{color:#bbb}.day .tasks .nt{font-size:10px;color:#888;margin-top:3px;font-style:italic}
+.day .ck{display:grid;gap:2px;grid-template-columns:repeat(5,1fr);align-items:center}
+.day .ck .ckcell{display:flex;flex-direction:column;align-items:center;gap:1px}
+.day .ck input{width:14px;height:14px;cursor:pointer;margin:0}.day .ck .l{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:middle;border:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<!-- ===== AUTH SCREEN ===== -->
+<div id="auth">
+  <h1>APPLIED Exam Tracker</h1>
+  <p>Sign in with magic link. We'll email you a link — click it and you're in.</p>
+  <label for="email">Email</label>
+  <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+  <button id="sendLink">Send magic link</button>
+  <div class="msg" id="authMsg"></div>
+</div>
+
+<!-- ===== TRACKER ===== -->
+<div id="tracker"><div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>APPLIED Exam Tracker</h1>
+      <div class="sub">Apr 25, 2026 → exam Mon Jul 20, 2026  •  Supabase-synced</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="syncStatus">idle</span>
+      <span class="who" id="who"></span>
+      <button id="signOut">Sign out</button>
+    </div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div class="today" id="today"></div>
+
+  <div class="anchor"><h3>Consistency anchors (set up TODAY)</h3><ul>
+    <li><strong>Morning:</strong> after first coffee → Anki (15-20 min, 50 review cap, NO new in AM)</li>
+    <li><strong>Evening:</strong> after dinner at fixed time → study block (45-60 min weekdays). New Hot Rod cards + Dolphin photos PM.</li>
+    <li><strong>If you miss morning Anki</strong>, evening absorbs it. NEVER skip Anki entirely.</li>
+    <li><strong>End-of-day check</strong>: did I do Anki? Yes = day acceptable.</li>
+  </ul></div>
+
+  <div class="controls">
+    <button id="exA">Expand all</button>
+    <button id="coA">Collapse all</button>
+    <button id="jt">Jump to today</button>
+  </div>
+
+  <div id="weeks"></div>
+
+  <div class="legend">
+    <span><span class="sw" style="background:var(--weekend)"></span>Weekend deep work</span>
+    <span><span class="sw" style="background:var(--vacation)"></span>Vacation 1hr</span>
+    <span><span class="sw" style="background:var(--restricted)"></span>Graduation 1hr</span>
+    <span><span class="sw" style="background:var(--longday)"></span>Off work long day</span>
+    <span><span class="sw" style="background:var(--exam)"></span>Wind-down/exam</span>
+    <span><span class="sw" style="background:#fff7e0;border-left:3px solid var(--accent)"></span>Today</span>
+  </div>
+</div></div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+const SUPABASE_URL = 'https://cywqljirhysahavtsqff.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5d3FsamlyaHlzYWhhdnRzcWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMTMxNzYsImV4cCI6MjA5Mjc4OTE3Nn0.CgXPkSTQ-VCjcy4tuwBnzCWY559pCv0pVTuXtQSkBms';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// PLAN DATA
+// ============================================================
+const W=[
+{n:1,s:"2026-04-25",t:"W1: Peds Common — Neonatal & Viral",p:"peds",days:[
+{r:"Alikhan §4.1 Neonatal Dermatology (pp 229-233)",a:"Hot Rod: Pregnancy/Neonatal start (~25 new) | Dermki §4.1 (~10)",ph:"Dolphin: 30 random",q:"DIAGNOSTIC: 50 Qs random unanswered DermQbank — log %",ti:"3-4 hr",no:"Day 1. SETUP first 90 min: Anki cap=50, build Hot Rod focus deck, error log doc."},
+{r:"Alikhan §4.2 Viral Exanthems & Childhood Infections (pp 234-239)",a:"Hot Rod: Pregnancy/Neonatal (~20) + Infections-viral start (~10) | Dermki §4.2 (~15)",ph:"Dolphin: 50 random",q:"30 Qs random unanswered (mixed)",ti:"3-4 hr",no:"Sun retro at end: what worked? Plan W1 weekdays."},
+{r:"Re-skim §4.2 Viral Exanthems (focus images)",a:"AM: 50 rev. PM: Hot Rod Infections-viral (~25 new) | Dermki §4.2 highlights (~5)",ph:"Dolphin: 30 photos",q:"—",ti:"1.5-2 hr",no:"Standard weekday: AM Anki + PM read/photos."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Infections-viral (~20) | Dermki §4.2 (~5)",ph:"Dolphin: 30",q:"20 Qs random unanswered (mixed)",ti:"1.5-2 hr",no:"Tue Qbank night."},
+{r:"Alikhan §4.7 Disorders of Hair and Nails [peds] (pp 255-257)",a:"AM: 50 rev. PM: Hot Rod Disorders of skin appendages partial (~15) | Dermki §4.7 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Short read (3pp). More Anki + photos time."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Pregnancy/Neonatal + Infections-viral (~25 combined)",ph:"Dolphin: 30",q:"20 Qs random unanswered",ti:"1.5-2 hr",no:"Thu Qbank night."},
+{r:"Skim error log (10 min)",a:"AM: 50 rev. PM: 50 rev (no new today)",ph:"Dolphin: 20",q:"Interleaved 25 Qs random",ti:"1.5-2 hr",no:"Fri spaced retrieval — most important Qbank night."},
+{r:"Alikhan §4.15 Misc Pediatric Disorders (pp 281-292)",a:"AM: 50 rev + Hot Rod chapter sprint (30 new). PM: Dermki §4.7+§4.15 (~15)",ph:"Dolphin: 50 + DermNet peds 15 min",q:"30 Qs random unanswered",ti:"3-4 hr",no:"Sat deep dive. Three modalities. Break every 50 min."},
+{r:"Re-skim weak topics from Q errors",a:"AM: 50 rev + chapter subdeck. PM: light review",ph:"Dolphin: 40 (warmup for W2)",q:"25 Qs random + 10-min retro",ti:"3 hr",no:"Sun retro: re-read journal. Plan W2."}]},
+{n:2,s:"2026-05-04",t:"W2: Peds Vascular/EB + Infectious",p:"peds",days:[
+{r:"Alikhan §4.4 Epidermolysis Bullosa (pp 244-247)",a:"AM: 50 rev. PM: Hot Rod Blistering start (~25) | Dermki §4.4 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"EB dense — focus inheritance + targeted layer."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Blistering (~20)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank."},
+{r:"Alikhan §4.6 Vascular Tumors/Malformations (pp 250-254)",a:"AM: 50 rev. PM: Hot Rod Dermal/SQ tumors partial (~20 vasc focus) | Dermki §4.6 (~15)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Memorize PHACES, KTW, Sturge-Weber."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Dermal/SQ (~20)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Thu Qbank."},
+{r:"Skim error log",a:"AM: 50 rev. PM: 50 rev (no new)",ph:"Dolphin: 20",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri retrieval."},
+{r:"§5.1 Viral, §5.3 Bacterial (peds-relevant subsets)",a:"AM: 50 rev + Hot Rod sprint (~30). PM: Hot Rod Infections-bacterial (~15)",ph:"Dolphin: 50 + DermNet peds infections",q:"30 Qs random",ti:"3-4 hr",no:"Sat: peds-focused infections."},
+{r:"§5.4 Fungal, §5.5 Parasites (peds-relevant)",a:"AM: 50 rev + chapter subdeck. PM: Hot Rod Infections-fungal (~20)",ph:"Dolphin: 40",q:"25 Qs random + retro",ti:"3-4 hr",no:"Sun retro. Plan W3 (genoderm)."}]},
+{n:3,s:"2026-05-11",t:"W3: Peds Genodermatoses",p:"peds",days:[
+{r:"§4.3 Inherited Pigmentary (pp 240-243), §4.5 Tumor Syndromes (pp 248-249)",a:"AM: 50 rev. PM: Hot Rod Pigmentary (~15) + Genodermatoses start (~15) | Dermki §4.3, 4.5 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Pigmentary genoderm + tumor syndromes (NF, TS, Cowden)."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Genodermatoses (~25)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank."},
+{r:"§4.10 Autoinflammatory (pp 269-270), §4.11 Neurocutaneous (pp 271-274)",a:"AM: 50 rev. PM: Hot Rod Genodermatoses (~15) + Pruritus/neurocutaneous (~10) | Dermki §4.10, 4.11 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"NF1/2, TS, Sturge-Weber, ataxia-telangiectasia."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Genodermatoses (~20) + Endocrine/metabolic (~5)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Thu Qbank."},
+{r:"Skim error log + harder syndromes",a:"AM: 50 rev. PM: 50 rev (no new)",ph:"Dolphin: 20",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri retrieval."},
+{r:"§4.8 Metabolic, §4.9 CT, §4.12 Aging, §4.13 PID + §4.14 Cornification",a:"AM: 50 rev + sprint (~30). PM: Dermki §4.8, 4.9, 4.12-14 (~20)",ph:"Dolphin: 50 + DermNet genoderm",q:"30 Qs random",ti:"3-4 hr",no:"Sat: dense, group similar (CT diseases together; ichthyoses together)."},
+{r:"Re-skim weak syndromes + 4.14 cornification (ichthyoses)",a:"AM: 50 rev + subdeck. PM: light",ph:"Dolphin: 40 genoderm",q:"25 Qs + retro",ti:"3-4 hr",no:"Sun retro. Plan W4 (dermpath inflammatory)."}]},
+{n:4,s:"2026-05-18",t:"W4: Dermpath 1 — Inflammatory Patterns",p:"dermpath",days:[
+{r:"§7.1 Essential Concepts — Spongiotic + Psoriasiform",a:"AM: 50 rev. PM: Hot Rod Eczematous + Psoriasis (path angle, ~25) | Dermki §7.1 (~10)",ph:"PathologyOutlines: 20 inflammatory slides + Dolphin 20",q:"—",ti:"1.5-2 hr",no:"PATH WEEK. Photos > facts. WSI > re-reading."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Lichenoid (~20)",ph:"PathologyOutlines: 25 lichenoid/interface",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank + PathologyOutlines lichenoid module."},
+{r:"§7.1 Lichenoid/Interface, Vesicular",a:"AM: 50 rev. PM: Hot Rod Blistering (path, ~25)",ph:"PathologyOutlines: 25 vesicular",q:"—",ti:"1.5-2 hr",no:"Memorize: pemphigus DIF (intercellular), pemphigoid (linear BMZ), DH (granular IgA tips)."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Granulomatous (~20)",ph:"USCAP virtual: granulomatous (30 min)",q:"—",ti:"1.5-2 hr",no:"Thu = WSI drill instead of Qbank (your weakest sub-domain)."},
+{r:"Skim error log + path notes",a:"AM: 50 rev. PM: 50 rev (no new)",ph:"Dolphin: 30",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri retrieval."},
+{r:"§7.1 Vasculitis, Panniculitis patterns",a:"AM: 50 rev + Hot Rod path sprint (~30). PM: Dermki §7.1 (~20)",ph:"PathologyOutlines vasculitis+panniculitis 45 min + Dolphin 30",q:"30 Qs random",ti:"3-4 hr",no:"Sat path day. Two virtual slide modules."},
+{r:"Re-skim §7.1 weak patterns",a:"AM: 50 rev + path subdeck. PM: light",ph:"USCAP virtual 60 min mixed inflammatory",q:"25 Qs + retro",ti:"3-4 hr",no:"Sun retro. Plan W5 (vacation). Pack books? Skip if so."}]},
+{n:5,s:"2026-05-25",t:"W5: 🌴 VACATION — 1 hr/day maintenance",p:"vacation",days:[
+{r:"—",a:"AM: 30 reviews. 0 new.",ph:"Dolphin: 30 photos",q:"10 Qs random light",ti:"1 hr",no:"🌴 Vacation. Maintenance only. Skip travel days, no guilt."},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 30",q:"10 Qs",ti:"1 hr",no:"🌴 Vacation."},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 30",q:"10 Qs",ti:"1 hr",no:"🌴 Vacation."},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 30",q:"10 Qs",ti:"1 hr",no:"🌴 Vacation."},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 30",q:"10 Qs",ti:"1 hr",no:"🌴 Vacation."},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 30",q:"15 Qs",ti:"1 hr",no:"🌴 Vacation Saturday."},
+{r:"Plan W6 (dermpath tumors). Light skim §7.2.",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 30",q:"15 Qs",ti:"1 hr",no:"🌴 Vacation Sun. Plan W6."}]},
+{n:6,s:"2026-06-01",t:"W6: Dermpath 2 — Tumors (grad wknd 1hr)",p:"dermpath_grad",days:[
+{r:"§7.2 High-Yield Dermpath Diagnoses — Epidermal & Melanocytic",a:"AM: 50 rev. PM: Hot Rod NMSC (~15) + Melanocytic start (~15)",ph:"PathologyOutlines BCC/SCC/melanoma 30 min + Dolphin 20",q:"—",ti:"1.5-2 hr",no:"Tumor path. Frontload weekdays — grad wknd 1 hr only."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Melanocytic (~25)",ph:"PathologyOutlines melanocytic 30 min",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank."},
+{r:"§7.2 — Adnexal & Vascular tumors",a:"AM: 50 rev. PM: Hot Rod Dermal/subQ tumors (~25)",ph:"PathologyOutlines adnexal 30 min + Dolphin 20",q:"—",ti:"1.5-2 hr",no:"Adnexal tumors dense, high-yield."},
+{r:"§7.3 High-Yield Dermpath DDx",a:"AM: 50 rev. PM: Hot Rod Cutaneous lymphoma (~20)",ph:"USCAP virtual tumor 30 min",q:"—",ti:"1.5-2 hr",no:"Thu = WSI drill. DDx framework most useful."},
+{r:"Skim error log + weak tumor patterns",a:"AM: 50 rev. PM: 50 rev (no new)",ph:"Dolphin: 30",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri retrieval. NOTE: grad wknd = 1 hr only."},
+{r:"—",a:"AM: 30 rev. PM: 30 rev (no new today)",ph:"Dolphin: 20",q:"10 Qs",ti:"1 hr",no:"🎓 Grad Sat. 1 hr only. Congrats!"},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"Dolphin: 20",q:"10 Qs + plan W7",ti:"1 hr",no:"🎓 Grad Sun. Plan W7 (med derm 1)."}]},
+{n:7,s:"2026-06-08",t:"W7: Med Derm 1 — Papsq, Eczema, Interface, Bullous, CT",p:"medderm",days:[
+{r:"§3.1 Papulosquamous (pp 79-85, focus psoriasis)",a:"AM: 50 rev. PM: Hot Rod Psoriasis (~25) + Other papsq (~5) | Dermki §3.1 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Med derm starts. Pace yourself."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Other papsq (~25)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank. Other papsq = LP, PRP, parapsoriasis."},
+{r:"§3.2 Eczematous (pp 86-95)",a:"AM: 50 rev. PM: Hot Rod Eczematous (~25) | Dermki §3.2 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"AD, contact, seb derm, nummular, asteatotic, dyshidrotic."},
+{r:"§3.3 Interface Dermatitis (pp 96-106)",a:"AM: 50 rev. PM: Hot Rod Lichenoid (~25)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Thu Qbank. Interface = LP, lupus, DM, GVHD."},
+{r:"Skim error log + §2.4 Immunomodulatory (biologics, dosing)",a:"AM: 50 rev. PM: 50 rev (no new) + 10 pharm cards Dermki §2.4",ph:"Dolphin: 20",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri = pharm review. Biologics dosing/monitoring high-yield."},
+{r:"§3.4 Blistering (pp 107-118)",a:"AM: 50 rev + Hot Rod Blistering review (~30). PM: Dermki §3.4 (~20)",ph:"Dolphin: 50 + Bolognia bullous figures",q:"30 Qs random",ti:"3-4 hr",no:"Sat. Bullous = pemphigus, pemphigoid, DH, EBA, LABD. DIF patterns."},
+{r:"§3.5 Connective Tissue Disease (pp 119-148)",a:"AM: 50 rev + Hot Rod CT (~30). PM: Dermki §3.5 (~20)",ph:"Dolphin: 40",q:"25 Qs + retro",ti:"3-4 hr",no:"Sun: BIG CT chapter (30pp). Lupus, DM, scleroderma, MCTD. Plan W8."}]},
+{n:8,s:"2026-06-15",t:"W8: Med Derm 2 — Granulomatous → Drug + Immuno",p:"medderm",days:[
+{r:"§3.6 Granulomatous/Histiocytic (pp 149-160), §3.7 Monoclonal Gammopathies",a:"AM: 50 rev. PM: Hot Rod Granulomatous (~25) | Dermki §3.6, 3.7 (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Sarcoid, GA, NL, NXG. Histiocytoses: LCH, Erdheim-Chester."},
+{r:"—",a:"AM: 50 rev. PM: Hot Rod Urticaria/erythema (~25)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank."},
+{r:"§3.8-3.12 Xanthomas, Urticaria, Neutrophilic, Eosinophilic, Figurate",a:"AM: 50 rev. PM: Hot Rod Neutrophilic/eosinophilic (~25)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Many short sections. Sweet, PG, EED, urticaria types, EAC, EM."},
+{r:"§3.13 Follicular/Eccrine, §3.14 Drug Reactions",a:"AM: 50 rev. PM: Hot Rod Drug eruptions (~25) + Acne (~5)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Thu Qbank. Drug rx: SJS/TEN, DRESS, AGEP."},
+{r:"§1.6 Immunology + §2.10 Drug Reactions",a:"AM: 50 rev. PM: 50 rev + Hot Rod Immunology (~15)",ph:"Dolphin: 20",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri = BASIC SCIENCE day (your 8th %ile sub-weakness)."},
+{r:"§3.14, 3.15 Drug Rx + Photoderm + §1.4 Genetics",a:"AM: 50 rev + Hot Rod Drug sprint (~30). PM: Dermki §3.14, 3.15 (~20)",ph:"Dolphin: 40 + photoderm gallery 15 min",q:"30 Qs random",ti:"3-4 hr",no:"Sat. Cytochrome P450 interactions matter."},
+{r:"Re-skim immuno + drug rx (your weakest)",a:"AM: 50 rev + immuno subdeck. PM: light",ph:"Dolphin: 40",q:"25 Qs + retro",ti:"3-4 hr",no:"Sun retro. Plan W9."}]},
+{n:9,s:"2026-06-22",t:"W9: Med Derm 3 — Vascular, Pigmentary, Infections, Internal",p:"medderm",days:[
+{r:"§3.16 Amyloidoses, §3.17 Neurodermatology, §3.18 PPK, §3.19 Nutritional, §3.20 Depositional",a:"AM: 50 rev. PM: Hot Rod Pruritus/neurocutaneous (~15) + Deposition (~10) + Nutritional (~5)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Many short sections. PPK syndromes high-yield."},
+{r:"§3.21 Ulcers, §3.22 Vasculitides, §3.23 Panniculitides",a:"AM: 50 rev. PM: Hot Rod Vascular (~20) + Diseases of fat (~10)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank. Vasculitis classification (small/med/large)."},
+{r:"§3.24 Pregnancy, §3.25 Hair/Nail/Mucosal, §3.26 Pigmentary",a:"AM: 50 rev. PM: Hot Rod Pigmentary (~15) + Mucous membrane (~10) + Skin appendages (~10)",ph:"Dolphin: 30",q:"—",ti:"1.5-2 hr",no:"Vitiligo, melasma, post-inflam. Pregnancy: PUPPP, AEP."},
+{r:"Ch 5: §5.1 Viral, §5.2 HIV, §5.3 Bacterial (full review)",a:"AM: 50 rev. PM: Hot Rod Infections-bacterial (~15) + Mycobacterial (~10)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Thu Qbank. Adult focus this time."},
+{r:"§5.4 Fungal, §5.5 Parasites + skim Ch 10 Internal Disease",a:"AM: 50 rev. PM: 50 rev + Hot Rod Infestations (~15)",ph:"Dolphin: 20",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri retrieval. Internal: cardiac, endocrine, GI, neuro, renal."},
+{r:"Ch 10 Cutaneous Manifestations of Internal Disease (pp 505-526)",a:"AM: 50 rev + sprint (~30). PM: Dermki Ch 10 (~15)",ph:"Dolphin: 40 + Bolognia internal disease",q:"30 Qs random",ti:"3-4 hr",no:"Sat. All 6 sections, relatively short."},
+{r:"Re-skim weak categories + revisit §3.15 Photodermatoses",a:"AM: 50 rev + subdeck. PM: light",ph:"Dolphin: 40",q:"25 Qs + retro",ti:"3-4 hr",no:"Sun retro. Plan W10 (surg + cosm)."}]},
+{n:10,s:"2026-06-29",t:"W10: Surg + Cosmetic + Tumors + Basic Sci",p:"surg",days:[
+{r:"§8.1 Surgical Anatomy (pp 443-449), §8.2 Local Anesthetics (pp 450-453)",a:"AM: 50 rev. PM: Hot Rod Surgery (~25) | Dermki §8.1, 8.2 (~10)",ph:"Dolphin: 30 + danger-zone anatomy",q:"—",ti:"1.5-2 hr",no:"Memorize: facial nerves, danger zones, lidocaine max dose."},
+{r:"§8.3-8.6 Instruments, Sutures, Closure, Antisepsis",a:"AM: 50 rev. PM: Hot Rod Surgery (~25)",ph:"Dolphin: 30",q:"20 Qs random",ti:"1.5-2 hr",no:"Tue Qbank. Suture types (absorb vs not, mono vs braided)."},
+{r:"§8.7-8.13 Electrosurgery, Cryo, Excisions, Mohs, Flaps, Grafts",a:"AM: 50 rev. PM: Hot Rod Surgery + Dermki §8.10-8.12 Mohs (~15)",ph:"Dolphin: 30 + flap/graft diagrams 15 min",q:"—",ti:"1.5-2 hr",no:"Heaviest surg day. Flaps (advance, rotation, transposition, interpolation). Grafts (FTSG vs STSG)."},
+{r:"Ch 6 Neoplastic — §6.1 Keratinocytic, §6.2 Cysts, §6.3 Melanocytic",a:"AM: 50 rev. PM: Hot Rod NMSC review (~15) + Melanocytic review (~15)",ph:"Dolphin: 30 + dermoscopy primer",q:"20 Qs random",ti:"1.5-2 hr",no:"Thu Qbank. Tumor management focus this time."},
+{r:"Skim error log + §1.1 Structure/Function (pp 1-12)",a:"AM: 50 rev. PM: 50 rev + Hot Rod Foundations (~15)",ph:"Dolphin: 20",q:"Interleaved 25 Qs",ti:"1.5-2 hr",no:"Fri = basic sci review."},
+{r:"Ch 9 Cosmetic (pp 481-504)",a:"AM: 50 rev + Hot Rod Cosmetics sprint (~30). PM: Dermki Ch 9 (~20)",ph:"Dolphin: 30 + laser wavelength chart",q:"30 Qs random",ti:"3-4 hr",no:"Sat: cosmetic. Laser wavelengths + chromophores. Toxin units (Botox vs Dysport)."},
+{r:"§1.4 Genetics, §1.5 UV, §1.6 Immuno revisit, §1.7 Lab Techniques",a:"AM: 50 rev + Hot Rod Immunology + Foundations (~25). PM: light",ph:"Dolphin: 40",q:"25 Qs + retro",ti:"3-4 hr",no:"Sun retro. Final basic sci push. Plan W11 (CtB + practice)."}]},
+{n:11,s:"2026-07-06",t:"W11: CtB + Practice Exam (last work day Thu Jul 9)",p:"ctb",days:[
+{r:"Re-read top weak topic from CORE",a:"AM: 50 rev. PM: Targeted Hot Rod weak topic (~20)",ph:"Dolphin: 30",q:"30 Qs random",ti:"2 hr",no:"Mon: still working. Standard evening, slightly extended."},
+{r:"—",a:"AM: 50 rev. PM: Targeted Anki (~20)",ph:"Dolphin: 30",q:"30 Qs random",ti:"2 hr",no:"Tue: still working."},
+{r:"Re-read 2nd weak topic",a:"AM: 50 rev. PM: Targeted Anki (~20)",ph:"Dolphin: 30",q:"30 Qs random",ti:"2 hr",no:"Wed: still working."},
+{r:"Re-skim error log",a:"AM: 50 rev. PM: Targeted Anki (~15)",ph:"PathologyOutlines 30 min",q:"30 Qs random",ti:"2 hr",no:"Thu Jul 9: 🎉 LAST DAY OF WORK. Light evening — celebrate."},
+{r:"—",a:"AM: 30 reviews. 0 new.",ph:"—",q:"🎯 CtB §1: 94 min, 50 Qs timed → 90-min PDF answer review. Build error log by topic.",ti:"5-6 hr",no:"Fri Jul 10: OFF WORK. CtB Day 1. Treat as exam simulation."},
+{r:"—",a:"AM: 30 rev. 0 new.",ph:"—",q:"🎯 CtB §2: 58 min, 34 Qs timed → 60-min review. Cross-reference §1 errors.",ti:"4-5 hr",no:"Sat Jul 11: CtB Day 2. By end, 84 Qs of feedback."},
+{r:"Skim weak topics from CtB error log",a:"AM: 30 rev. 0 new.",ph:"—",q:"🎯 PE#1: 100 random unanswered DermQbank, timed → 60-min review. Identify final 3 weak topics for W12.",ti:"5-6 hr",no:"Sun Jul 12: PE#1. Three exam exposures total this week."}]},
+{n:12,s:"2026-07-13",t:"W12: WIND-DOWN (off work, exam Mon Jul 20)",p:"winddown",days:[
+{r:"Skim weak topic 1",a:"AM: 50 rev. 0 new.",ph:"Dolphin: 80 (image-recog warmup)",q:"Targeted: 30 Qs DermQbank weak topic 1 filter",ti:"3-4 hr",no:"Mon: peds/dermpath photo focus. NOW use topical Qbank filters."},
+{r:"Skim weak topic 2",a:"AM: 50 rev. STOP NEW CARDS.",ph:"PathologyOutlines 60 min WSI",q:"Targeted: 30 Qs weak topic 2",ti:"3-4 hr",no:"Tue: dermpath WSI focus."},
+{r:"Skim weak topic 3",a:"AM: 50 rev.",ph:"Dolphin 60 + DermNet med derm 30 min",q:"Targeted: 30 Qs weak topic 3",ti:"3-4 hr",no:"Wed: med derm photo focus. Last heavy day."},
+{r:"Light error log only",a:"AM: 30 rev (taper).",ph:"Dolphin: 40",q:"10 Qs — LAST Qs of prep",ti:"2-3 hr",no:"Thu: TAPER. After this, no more Qs."},
+{r:"—",a:"AM: 30 rev. LAST Anki day.",ph:"Dolphin: 30",q:"—",ti:"1.5 hr",no:"Fri Jul 17: Confirm exam logistics — ID, location, parking, route. Pack."},
+{r:"—",a:"REST — no Anki.",ph:"—",q:"—",ti:"0 min",no:"Sat Jul 18: REST. Pack bag. Walk. No studying."},
+{r:"—",a:"REST — no Anki.",ph:"—",q:"—",ti:"0 min",no:"Sun Jul 19: REST. Sleep early. No studying."}]}];
+const DN=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const FIELDS = ['am_anki','read_done','new_cards','photos','qbank'];
+const FIELD_LABELS = {am_anki:'AM',read_done:'R',new_cards:'NC',photos:'PH',qbank:'Q'};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function dAdd(iso,d){const x=new Date(iso+"T00:00:00");x.setDate(x.getDate()+d);return x}
+function isoOf(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return`${y}-${m}-${dd}`}
+function fmt(d){return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+
+// All days flat
+const ALL=[];W.forEach(w=>{w.days.forEach((dd,i)=>{const dt=dAdd(w.s,i);ALL.push({iso:isoOf(dt),date:dt,week:w,idx:i,d:dd})})});
+
+// Local cache of study_log rows by date
+let logByDate = {};   // { 'YYYY-MM-DD': { am_anki, read_done, new_cards, photos, qbank, energy, journal } }
+let userId = null;
+
+// ============================================================
+// SYNC STATUS
+// ============================================================
+const syncEl = ()=>document.getElementById('syncStatus');
+function setSync(state, text){
+  const el = syncEl();
+  el.className = state;
+  el.textContent = text;
+}
+
+// ============================================================
+// DATA SAVE
+// ============================================================
+let saveTimer = null;
+async function saveDay(date, fields){
+  if (!userId) return;
+  setSync('saving', 'saving…');
+  // Merge with cached row to avoid overwriting other fields
+  const existing = logByDate[date] || {};
+  const merged = { user_id: userId, date, ...existing, ...fields };
+  // Strip nulls/undefineds
+  Object.keys(merged).forEach(k => merged[k] === undefined && delete merged[k]);
+  const { data, error } = await sb
+    .from('study_log')
+    .upsert(merged, { onConflict: 'user_id,date' })
+    .select()
+    .single();
+  if (error) {
+    console.error('save error', error);
+    setSync('err', 'save failed');
+  } else {
+    logByDate[date] = data;
+    setSync('saved', 'saved');
+    setTimeout(()=>{ if(syncEl().textContent==='saved') setSync('','idle') }, 1500);
+  }
+}
+
+// Debounced version for journal text input
+function saveDayDebounced(date, fields){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>saveDay(date, fields), 600);
+}
+
+// ============================================================
+// DATA LOAD
+// ============================================================
+async function loadAll(){
+  setSync('saving','loading…');
+  const { data, error } = await sb.from('study_log').select('*');
+  if (error) { console.error(error); setSync('err','load failed'); return; }
+  logByDate = {};
+  data.forEach(row => { logByDate[row.date] = row });
+  setSync('saved','loaded');
+  setTimeout(()=>setSync('','idle'), 1000);
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function getLog(iso){ return logByDate[iso] || {} }
+
+function renderTracker(){
+  const tdy = new Date(); tdy.setHours(12,0,0,0);
+  const tdyIso = isoOf(tdy);
+  const tdyE = ALL.find(x=>x.iso===tdyIso) || ALL[0];
+  const exam = new Date("2026-07-20T00:00:00");
+  const dte = Math.max(0, Math.round((exam-tdy)/86400000));
+
+  // Summary
+  document.getElementById("summary").innerHTML=`
+    <div class="stat"><div class="l">Today</div><div class="v">${tdy.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div></div>
+    <div class="stat"><div class="l">Days to exam</div><div class="v exam">${dte}</div></div>
+    <div class="stat"><div class="l">Current week</div><div class="v">W${tdyE.week.n}</div></div>
+    <div class="stat"><div class="l">Phase</div><div class="v">${tdyE.week.t.split('—')[0].replace('🌴 ','').replace('WIND-DOWN','Wind-down').trim()}</div></div>`;
+
+  // Today card
+  const t = tdyE.d;
+  const log = getLog(tdyIso);
+  document.getElementById("today").innerHTML=`
+    <h2>What to do today</h2>
+    <div class="d">${tdy.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · ${tdyE.week.t}</div>
+    <div class="today-blocks">
+      <div class="block read"><div class="t">Read</div><div class="b">${t.r||"—"}</div><div class="c"><label><input type="checkbox" data-f="read_done" data-d="${tdyIso}" ${log.read_done?'checked':''}> done</label></div></div>
+      <div class="block am"><div class="t">AM Anki (50 rev)</div><div class="b">${t.a||"—"}</div><div class="c"><label><input type="checkbox" data-f="am_anki" data-d="${tdyIso}" ${log.am_anki?'checked':''}> done</label></div></div>
+      <div class="block newcards"><div class="t">PM new cards (Hot Rod + Dermki)</div><div class="b">Hot Rod + Dermki new cards from week's topic</div><div class="c"><label><input type="checkbox" data-f="new_cards" data-d="${tdyIso}" ${log.new_cards?'checked':''}> done</label></div></div>
+      <div class="block photos"><div class="t">Photos / Atlas</div><div class="b">${t.ph||"—"}</div><div class="c"><label><input type="checkbox" data-f="photos" data-d="${tdyIso}" ${log.photos?'checked':''}> done</label></div></div>
+      <div class="block qbank"><div class="t">Qbank</div><div class="b">${t.q||"—"}</div><div class="c"><label><input type="checkbox" data-f="qbank" data-d="${tdyIso}" ${log.qbank?'checked':''}> done</label></div></div>
+      <div class="block"><div class="t">Time + Notes</div><div class="b"><strong>${t.ti||"—"}</strong><br>${t.no||""}</div></div>
+    </div>
+    <div class="journal">
+      <label>End-of-day journal (1 line)</label>
+      <input type="text" id="todayJournal" data-d="${tdyIso}" value="${(log.journal||'').replace(/"/g,'&quot;')}" placeholder="e.g., morning Anki worked, evening hit a wall after 30 min">
+      <div class="e">
+        <span style="font-size:10px;color:var(--muted);margin-right:4px;">Energy:</span>
+        ${[1,2,3,4,5].map(n=>`<button data-energy="${n}" data-d="${tdyIso}" class="${log.energy===n?'active':''}">${n}</button>`).join("")}
+      </div>
+    </div>`;
+
+  // Weeks
+  const we = document.getElementById("weeks");
+  we.innerHTML = "";
+  W.forEach(w => {
+    const sd = new Date(w.s+"T00:00:00"), ed = dAdd(w.s, w.days.length-1);
+    const wd = document.createElement("div");
+    wd.className = "week";
+    if (w.n === tdyE.week.n) wd.classList.add("open");
+
+    let hc = "";
+    if (w.p === "vacation") hc = "vac";
+    else if (w.p === "winddown") hc = "win";
+    else if (w.p === "ctb") hc = "ctb";
+    else if (w.p === "dermpath_grad") hc = "grad";
+
+    // Compute progress
+    let totalChecks = 0, doneChecks = 0;
+    w.days.forEach((_, i) => {
+      const iso = isoOf(dAdd(w.s, i));
+      const dlog = getLog(iso);
+      FIELDS.forEach(f => { totalChecks++; if (dlog[f]) doneChecks++; });
+    });
+    const progressTxt = `${doneChecks}/${totalChecks}`;
+
+    let dh = "";
+    w.days.forEach((dd, i) => {
+      const dt = dAdd(w.s, i);
+      const iso = isoOf(dt);
+      const dlog = getLog(iso);
+      const dow = dt.getDay();
+      const dowI = dow === 0 ? 6 : dow - 1;
+      const isWe = dowI >= 5;
+      const isT = iso === tdyIso;
+      let cls = "day";
+      if (w.p === "vacation") cls += " vac";
+      else if (w.p === "dermpath_grad" && isWe) cls += " gr";
+      else if (w.p === "ctb" && i >= 4) cls += " lg";
+      else if (w.p === "winddown" && dowI >= 5) cls += " win";
+      else if (isWe) cls += " we";
+      if (isT) cls += " tdy";
+
+      const cks = FIELDS.map(f => `
+        <div class="ckcell">
+          <input type="checkbox" data-f="${f}" data-d="${iso}" ${dlog[f]?'checked':''} title="${f.replace('_',' ')}">
+          <span class="l">${FIELD_LABELS[f]}</span>
+        </div>`).join("");
+
+      dh += `
+        <div class="${cls}">
+          <div class="dt">${fmt(dt)}<span class="dow">${DN[dowI]}</span></div>
+          <div class="tasks">
+            <div class="row"><span class="lbl">Read</span><span class="val ${!dd.r||dd.r==='—'?'empty':''}">${dd.r||"—"}</span></div>
+            <div class="row"><span class="lbl">Anki</span><span class="val">${dd.a||"—"}</span></div>
+            <div class="row"><span class="lbl">Photos</span><span class="val">${dd.ph||"—"}</span></div>
+            <div class="row"><span class="lbl">Qbank</span><span class="val">${dd.q||"—"}</span></div>
+            ${dd.ti?`<div class="row"><span class="lbl">Time</span><span class="val">${dd.ti}</span></div>`:""}
+            ${dd.no?`<div class="nt">${dd.no}</div>`:""}
+          </div>
+          <div class="ck">${cks}</div>
+        </div>`;
+    });
+
+    if (w.n === 12) dh += `<div class="day exm"><div class="dt">Jul 20<span class="dow">Mon</span></div><div class="tasks"><div class="row"><span class="val">🎯 APPLIED EXAM — eat, hydrate, trust the prep.</span></div></div><div class="ck">🎯</div></div>`;
+
+    wd.innerHTML = `
+      <div class="wh ${hc}">
+        <div class="info"><span class="n">W${w.n}</span><span class="th">${w.t}</span><span class="dt">${fmt(sd)} – ${fmt(ed)}</span></div>
+        <span class="progress">${progressTxt}</span>
+        <span>▼</span>
+      </div>
+      <div class="wb">${dh}</div>`;
+    wd.querySelector(".wh").onclick = (e) => {
+      // Don't toggle if clicking progress badge
+      wd.classList.toggle("open");
+    };
+    we.appendChild(wd);
+  });
+
+  // Wire up event handlers (event delegation)
+  document.body.addEventListener('change', handleChange);
+  document.body.addEventListener('click', handleClick);
+  document.body.addEventListener('input', handleInput);
+}
+
+function handleChange(e){
+  const t = e.target;
+  if (t.matches('input[type=checkbox][data-f][data-d]')){
+    const date = t.dataset.d, field = t.dataset.f;
+    saveDay(date, { [field]: t.checked });
+  }
+}
+
+function handleClick(e){
+  const t = e.target;
+  if (t.matches('button[data-energy][data-d]')){
+    const date = t.dataset.d, energy = parseInt(t.dataset.energy, 10);
+    // Toggle off if already active
+    const wasActive = t.classList.contains('active');
+    document.querySelectorAll(`button[data-energy][data-d="${date}"]`).forEach(b=>b.classList.remove('active'));
+    if (!wasActive) t.classList.add('active');
+    saveDay(date, { energy: wasActive ? null : energy });
+  }
+}
+
+function handleInput(e){
+  const t = e.target;
+  if (t.matches('input[type=text][data-d]') && t.id === 'todayJournal'){
+    const date = t.dataset.d;
+    saveDayDebounced(date, { journal: t.value });
+  }
+}
+
+// ============================================================
+// AUTH FLOW
+// ============================================================
+const authEl = document.getElementById('auth');
+const trackerEl = document.getElementById('tracker');
+const emailInput = document.getElementById('email');
+const sendBtn = document.getElementById('sendLink');
+const authMsg = document.getElementById('authMsg');
+
+function showLogin(){ authEl.style.display='block'; trackerEl.style.display='none' }
+function showTracker(user){
+  authEl.style.display='none';
+  trackerEl.style.display='block';
+  document.getElementById('who').innerHTML = `Signed in: <strong>${user.email}</strong>`;
+  loadAll().then(renderTracker);
+}
+
+sendBtn.onclick = async () => {
+  const email = emailInput.value.trim();
+  if (!email) return;
+  sendBtn.disabled = true;
+  authMsg.className = 'msg';
+  authMsg.textContent = '';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href }
+  });
+  sendBtn.disabled = false;
+  if (error) {
+    authMsg.className = 'msg err';
+    authMsg.textContent = `Error: ${error.message}`;
+  } else {
+    authMsg.className = 'msg ok';
+    authMsg.textContent = `Magic link sent to ${email}. Check your inbox and click the link to sign in.`;
+  }
+};
+
+emailInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendBtn.click() });
+
+document.getElementById('signOut').onclick = async () => {
+  await sb.auth.signOut();
+  // showLogin is triggered by onAuthStateChange
+};
+
+// Wire up controls
+document.addEventListener('DOMContentLoaded', () => {
+  // (handled after render)
+});
+
+// Auth listener
+sb.auth.onAuthStateChange((event, session) => {
+  if (session && session.user) {
+    userId = session.user.id;
+    showTracker(session.user);
+  } else {
+    userId = null;
+    showLogin();
+  }
+});
+
+// Initial check
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && session.user) {
+    userId = session.user.id;
+    showTracker(session.user);
+  } else {
+    showLogin();
+  }
+})();
+
+// Wire up control buttons after first render
+const bindControls = () => {
+  const exA = document.getElementById('exA');
+  const coA = document.getElementById('coA');
+  const jt = document.getElementById('jt');
+  if (exA) exA.onclick = () => document.querySelectorAll(".week").forEach(x=>x.classList.add("open"));
+  if (coA) coA.onclick = () => document.querySelectorAll(".week").forEach(x=>x.classList.remove("open"));
+  if (jt) jt.onclick = () => {
+    const tdy = new Date(); tdy.setHours(12,0,0,0);
+    const tdyIso = isoOf(tdy);
+    const tdyE = ALL.find(x=>x.iso===tdyIso) || ALL[0];
+    const i = W.findIndex(x => x.n === tdyE.week.n);
+    const c = document.querySelectorAll(".week")[i];
+    if (c) { c.classList.add("open"); c.scrollIntoView({behavior:"smooth", block:"start"}); }
+  };
+};
+// Re-bind after each render
+const _origRender = renderTracker;
+renderTracker = function(){ _origRender(); bindControls(); };
+</script>
+</body>
+</html>
