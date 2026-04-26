@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Node / build artifacts (in case we ever add JS tooling)
+node_modules/
+dist/
+build/
+
+# Environment variables (should NEVER be in a public repo)
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local-only files
+*.local
